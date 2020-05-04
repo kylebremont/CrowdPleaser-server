@@ -31,20 +31,19 @@ mongo.connect(uri,  { useNewUrlParser: true, useUnifiedTopology: true }, functio
             var device = JSON.parse(JSON.stringify({"_id": key, "access_token": req.body.device_id}))
         }
 
-        if (dbo.collection("devices").find(device)) {
-            console.log(device)
-            res.send("already in db")
-            return;
-        }
-
-        dbo.collection("devices").insertOne(device, function(err, res) {
-            if (err) throw err;
-            console.log("1 document inserted");
-            db.close();
+        dbo.collection("devices").find(device).toArray()
+        .then(results => {
+            if (results.length !== 0) {
+                res.send("Already in db")
+                return;
+            } else {
+                dbo.collection("devices").insertOne(device, function(err, res) {
+                    if (err) throw err;
+                });
+                res.status(200).send("Device added to DB");
+            }
+            
         });
-
-    
-        res.send(req.body);
     })
 });
 
