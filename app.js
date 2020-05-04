@@ -3,7 +3,6 @@ const express = require('express')
 const app = express()
 var mongo = require('mongodb');
 const port = 3500
-
 const MongoClient = require('mongodb').MongoClient;
 
 app.use(bodyParser.json());
@@ -17,20 +16,16 @@ let allowCrossDomain = function(req, res, next) {
   }
 app.use(allowCrossDomain);
 
-
 const uri = "mongodb+srv://Server:Crowdpleaser!@crowd-cluster-mvc86.gcp.mongodb.net/test?retryWrites=true&w=majority"
 mongo.connect(uri,  { useNewUrlParser: true, useUnifiedTopology: true }, function(err, db) {
-
-
-    var dbo = db.db("crowdpleaser");
-
-
-
 
     if(err) {
         console.log('Sorry unable to connect to MongoDB Error:', err);
     }
     console.log("Connected to mongodb");
+
+
+    var dbo = db.db("crowdpleaser");
 
     app.get('/', (req, res) => res.send('Hello World!'))
 
