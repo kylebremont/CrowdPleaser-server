@@ -19,7 +19,9 @@
   "homepage": "https://github.com/kylebremont/CrowdPleaser-server#readme",
   "dependencies": {
     "express": "^4.17.1",
-    "mongodb": "^3.5.7",
+    "mongodb": "^3.5.7"
+  },
+  "devDependencies": {
     "nodemon": "^2.0.3"
   }
 }
