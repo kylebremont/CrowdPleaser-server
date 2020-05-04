@@ -37,12 +37,12 @@ mongo.connect(uri,  { useNewUrlParser: true, useUnifiedTopology: true }, functio
     app.put('/devices', (req, res) => {
         // add to db
         for (key in req.body) {
-            console.log(req.body[key])
-            // console.log(req.body.device_id[key])
             var device = JSON.parse(JSON.stringify({"_id": key, "access_token": req.body[key]}))
         }
-        dbo.collection("devices").find(device).toArray()
+        dbo.collection("devices").find(device["_id"]).toArray()
         .then(results => {
+
+            //TODO: UPDATE DEVICE THAT'S ALREADY IN MONGO WITH NEW ACCESS TOKEN
             if (results.length !== 0) {
                 res.send("Already in db")
                 return;
