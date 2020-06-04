@@ -60,6 +60,8 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		// create unique user id
 		var host_id = uuid();
 
+		var access_token = req.body.access_token;
+
 		// create unique party id
 		var party_id = randomWords({ exactly: 1, maxLength: 5 });
 
@@ -78,7 +80,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 			.then(() => {
 				let new_party = {
 					_id: party_id[0],
-					host: host_id,
+					host: { access_token: access_token },
 					members: [],
 					queue: []
 				};
@@ -91,30 +93,57 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		var member_id = uuid();
 
 		// extract party code from request params
-		var party_code = 'butts';
+		var party_code = req.query['party_code'];
 
 		// check if game is active
 		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
 			if (party.length !== 0) {
+				// if active, update members
 				let members = party[0].members;
 				members.push(member_id);
 				dbo
 					.collection('parties')
-					.update(
+					.updateOne(
 						{ _id: party[0]._id },
 						{
 							$set: { members: members }
 						}
 					)
-					.then(res.status(200).send('added to db'));
+					.then(res.status(200).send('Added to db'));
 			} else {
-				res.status(200).send("party doesn't exist");
+				// if not, let em know
+				res.status(200).send("Party doesn't exist");
 			}
 		});
+	});
 
-		// if active, update members
+	app.put('/queue_song', (req, res) => {
+		// extract party code from request params
+		var party_code = req.query['party_code'];
 
-		// if not, let em know
+		var song = req.body;
+
+		// check if song already in queue
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			var queue = party[0].queue;
+			for (var key in queue) {
+				if (queue[key].artist === song.artist && queue[key].name === song.name) {
+					res.status(200).send('Already in queue');
+					return;
+				}
+			}
+			queue.push(song);
+
+			dbo
+				.collection('parties')
+				.updateOne(
+					{ _id: party[0]._id },
+					{
+						$set: { queue: queue }
+					}
+				)
+				.then(res.status(200).send('Added to queue'));
+		});
 	});
 });
 
