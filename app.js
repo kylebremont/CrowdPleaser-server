@@ -82,7 +82,8 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 					_id: party_id[0],
 					host: { access_token: access_token },
 					members: [],
-					queue: []
+					queue: [],
+					currently_playing: null
 				};
 				dbo.collection('parties').insertOne(new_party).then(res.status(201).send(party_id));
 			});
@@ -95,7 +96,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		// extract party code from request params
 		var party_code = req.query['party_code'];
 
-		// check if game is active
+		// check if party is active
 		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
 			if (party.length !== 0) {
 				// if active, update members
@@ -143,6 +144,33 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 					}
 				)
 				.then(res.status(200).send(queue));
+		});
+	});
+
+	app.put('/change_playing', (req, res) => {
+		// extract party code from request params
+		var party_code = req.query['party_code'];
+
+		var song = req.body;
+
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			dbo
+				.collection('parties')
+				.updateOne(
+					{ _id: party[0]._id },
+					{
+						$set: { currently_playing: song }
+					}
+				)
+				.then(res.status(200).send(song));
+		});
+	});
+
+	app.get('/currently_playing', (req, res) => {
+		var party_code = req.query['party_code'];
+
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			res.status(200).send(party[0].currently_playing);
 		});
 	});
 });
