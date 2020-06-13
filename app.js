@@ -142,7 +142,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 						$set: { queue: queue }
 					}
 				)
-				.then(res.status(200).send('Added to queue'));
+				.then(res.status(200).send(queue));
 		});
 	});
 });
