@@ -84,7 +84,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 					members: [],
 					queue: []
 				};
-				dbo.collection('parties').insertOne(new_party).then(res.status(200).send(party_id));
+				dbo.collection('parties').insertOne(new_party).then(res.status(201).send(party_id));
 			});
 	});
 
@@ -109,10 +109,10 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 							$set: { members: members }
 						}
 					)
-					.then(res.status(200).send('Added to db'));
+					.then(res.status(200).send('Joined party'));
 			} else {
 				// if not, let em know
-				res.status(200).send("Party doesn't exist");
+				res.status(404).send("Party doesn't exist");
 			}
 		});
 	});
