@@ -83,7 +83,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 					host: { access_token: access_token },
 					members: [],
 					queue: [],
-					currently_playing: null
+					currently_playing: []
 				};
 				dbo.collection('parties').insertOne(new_party).then(res.status(201).send(party_id));
 			});
@@ -118,6 +118,15 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		});
 	});
 
+	app.get('/queue', (req, res) => {
+		var party_code = req.query.party_code;
+
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			var queue = party[0].queue;
+			res.status(200).send(queue);
+		});
+	});
+
 	app.put('/queue_song', (req, res) => {
 		// extract party code from request params
 		var party_code = req.query['party_code'];
@@ -134,6 +143,25 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 				}
 			}
 			queue.push(song);
+
+			dbo
+				.collection('parties')
+				.updateOne(
+					{ _id: party[0]._id },
+					{
+						$set: { queue: queue }
+					}
+				)
+				.then(res.status(200).send(queue));
+		});
+	});
+
+	app.put('/dequeue_song', (req, res) => {
+		var party_code = req.query['party_code'];
+
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			var queue = party[0].queue;
+			queue.shift();
 
 			dbo
 				.collection('parties')
