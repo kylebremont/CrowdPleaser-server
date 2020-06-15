@@ -201,6 +201,31 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 			res.status(200).send(party[0].currently_playing);
 		});
 	});
+
+	app.put('/vote', (req, res) => {
+		var party_code = req.query['party_code'];
+
+		var song = req.body;
+
+		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
+			var queue = party[0].queue;
+			for (let i = 0; i < queue.length; i++) {
+				if (song.uri === queue[i].uri) {
+					queue[i].votes += 1;
+					var votes = queue[i].votes;
+					dbo
+						.collection('parties')
+						.updateOne(
+							{ _id: party[0]._id },
+							{
+								$set: { queue: queue }
+							}
+						)
+						.then(res.status(200).send(queue[i]));
+				}
+			}
+		});
+	});
 });
 
 app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
