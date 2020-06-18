@@ -19,6 +19,24 @@ let allowCrossDomain = function(req, res, next) {
 };
 app.use(allowCrossDomain);
 
+let selectionSort = (arr) => {
+	let len = arr.length;
+	for (let i = 0; i < len; i++) {
+		let min = i;
+		for (let j = i + 1; j < len; j++) {
+			if (arr[j].votes > arr[min].votes) {
+				min = j;
+			}
+		}
+		if (min !== i) {
+			let tmp = arr[i];
+			arr[i] = arr[min];
+			arr[min] = tmp;
+		}
+	}
+	return arr;
+};
+
 const uri = 'mongodb+srv://Server:Crowdpleaser!@crowd-cluster-mvc86.gcp.mongodb.net/test?retryWrites=true&w=majority';
 mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function(err, db) {
 	if (err) {
@@ -212,7 +230,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 			for (let i = 0; i < queue.length; i++) {
 				if (song.uri === queue[i].uri) {
 					queue[i].votes += 1;
-					var votes = queue[i].votes;
+					queue = selectionSort(queue);
 					dbo
 						.collection('parties')
 						.updateOne(
@@ -221,7 +239,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 								$set: { queue: queue }
 							}
 						)
-						.then(res.status(200).send(queue[i]));
+						.then(res.status(200).send(queue));
 				}
 			}
 		});
