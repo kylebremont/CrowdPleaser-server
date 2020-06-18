@@ -99,11 +99,15 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 				let new_party = {
 					_id: party_id[0],
 					host: { access_token: access_token },
-					members: [],
+					members: [ host_id ],
 					queue: [],
 					currently_playing: []
 				};
-				dbo.collection('parties').insertOne(new_party).then(res.status(201).send(party_id));
+
+				dbo
+					.collection('parties')
+					.insertOne(new_party)
+					.then(res.send({ statusCode: 200, member_id: host_id, party_id: party_id }));
 			});
 	});
 
@@ -128,7 +132,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 							$set: { members: members }
 						}
 					)
-					.then(res.status(200).send('Joined party'));
+					.then(res.send({ statusCode: 200, member_id: member_id }));
 			} else {
 				// if not, let em know
 				res.status(404).send("Party doesn't exist");
@@ -222,14 +226,28 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 
 	app.put('/vote', (req, res) => {
 		var party_code = req.query['party_code'];
+		var member_id = req.query['member_id'];
 
 		var song = req.body;
 
 		dbo.collection('parties').find({ _id: party_code }).toArray().then((party) => {
 			var queue = party[0].queue;
+			var voted, index;
+
 			for (let i = 0; i < queue.length; i++) {
 				if (song.uri === queue[i].uri) {
-					queue[i].votes += 1;
+					voted = queue[i].voted;
+					index = voted.indexOf(member_id);
+					// index is -1 if the user has not already voted for this song
+					if (index !== -1) {
+						voted.splice(index);
+						queue[i].votes = voted.length;
+					} else {
+						voted.push(member_id);
+						queue[i].votes = voted.length;
+					}
+
+					queue[i].voted = voted;
 					queue = selectionSort(queue);
 					dbo
 						.collection('parties')
