@@ -24,7 +24,9 @@
     "https": "^1.0.0",
     "mongodb": "^3.5.7",
     "querystring": "^0.2.0",
-    "url": "^0.11.0"
+    "random-words": "^1.1.1",
+    "url": "^0.11.0",
+    "uuidv4": "^6.1.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.3"
