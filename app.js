@@ -1,25 +1,21 @@
 var bodyParser = require('body-parser');
 const express = require('express');
-const app = express();
+const request = require('request');
+var cors = require('cors');
+var querystring = require('querystring');
+var cookieParser = require('cookie-parser');
+
 var mongo = require('mongodb');
-const { uuid } = require('uuidv4');
-var randomWords = require('random-words');
 const MongoClient = require('mongodb').MongoClient;
+
+const config = require('./config');
+var { clientId, secret, redirectUri, scopes } = config;
+var randomWords = require('random-words');
+const { uuid } = require('uuidv4');
 
 const port = 3500;
 
-app.use(bodyParser.json());
-
-// allow cross-origin requests
-let allowCrossDomain = function(req, res, next) {
-	res.header('Access-Control-Allow-Origin', '*');
-	res.header('Access-Control-Allow-Headers', '*');
-	res.header('Access-Control-Allow-Methods', '*');
-	next();
-};
-app.use(allowCrossDomain);
-
-let selectionSort = (arr) => {
+var selectionSort = (arr) => {
 	let len = arr.length;
 	for (let i = 0; i < len; i++) {
 		let min = i;
@@ -37,6 +33,35 @@ let selectionSort = (arr) => {
 	return arr;
 };
 
+/**
+ * Generates a random string containing numbers and letters
+ * @param  {number} length The length of the string
+ * @return {string} The generated string
+ */
+var generateRandomString = function(length) {
+	var text = '';
+	var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+	for (var i = 0; i < length; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
+};
+
+var stateKey = 'spotify_auth_state';
+
+const app = express();
+
+// allow cross-origin requests
+let allowCrossDomain = function(req, res, next) {
+	res.header('Access-Control-Allow-Origin', '*');
+	res.header('Access-Control-Allow-Headers', '*');
+	res.header('Access-Control-Allow-Methods', '*');
+	next();
+};
+
+app.use(bodyParser.json()).use(cors()).use(cookieParser()).use(allowCrossDomain);
+
 const uri = 'mongodb+srv://Server:Crowdpleaser!@crowd-cluster-mvc86.gcp.mongodb.net/test?retryWrites=true&w=majority';
 mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function(err, db) {
 	if (err) {
@@ -48,31 +73,137 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 
 	app.get('/', (req, res) => res.send('Hello World!'));
 
-	app.put('/devices', (req, res) => {
-		// add to db
-		for (key in req.body) {
-			var device = JSON.parse(JSON.stringify({ _id: key, access_token: req.body[key] }));
+	// app.put('/devices', (req, res) => {
+	// 	// add to db
+	// 	for (key in req.body) {
+	// 		var device = JSON.parse(JSON.stringify({ _id: key, access_token: req.body[key] }));
+	// 	}
+	// 	dbo.collection('devices').find(device['_id']).toArray().then((results) => {
+	// 		//TODO: UPDATE DEVICE THAT'S ALREADY IN MONGO WITH NEW ACCESS TOKEN
+	// 		if (results.length !== 0) {
+	// 			res.send('Already in db');
+	// 			return;
+	// 		} else {
+	// 			dbo.collection('devices').insertOne(device, function(err, res) {
+	// 				if (err) throw err;
+	// 			});
+	// 			res.status(200).send('Device added to DB');
+	// 		}
+	// 	});
+	// });
+
+	app.get('/login', (req, res) => {
+		var state = generateRandomString(16);
+		res.cookie(stateKey, state);
+
+		// your application requests authorization
+		res.redirect(
+			'https://accounts.spotify.com/authorize?' +
+				querystring.stringify({
+					response_type: 'token',
+					client_id: clientId,
+					scope: scopes,
+					redirect_uri: redirectUri,
+					state: state
+				})
+		);
+	});
+
+	app.get('/callback', function(req, res) {
+		// your application requests refresh and access tokens
+		// after checking the state parameter
+
+		var code = req.query.code || null;
+		var state = req.query.state || null;
+		var storedState = req.cookies ? req.cookies[stateKey] : null;
+
+		if (state === null || state !== storedState) {
+			res.redirect(
+				'/#' +
+					querystring.stringify({
+						error: 'state_mismatch'
+					})
+			);
+		} else {
+			res.clearCookie(stateKey);
+			var authOptions = {
+				url: 'https://accounts.spotify.com/api/token',
+				form: {
+					code: code,
+					redirect_uri: redirectUri,
+					grant_type: 'authorization_code'
+				},
+				headers: {
+					Authorization: 'Basic ' + new Buffer(clientId + ':' + secret).toString('base64')
+				},
+				json: true
+			};
+
+			request.post(authOptions, function(error, response, body) {
+				if (!error && response.statusCode === 200) {
+					var access_token = body.access_token,
+						refresh_token = body.refresh_token;
+
+					var options = {
+						url: 'https://api.spotify.com/v1/me',
+						headers: { Authorization: 'Bearer ' + access_token },
+						json: true
+					};
+
+					// use the access token to access the Spotify Web API
+					request.get(options, function(error, response, body) {
+						console.log(body);
+					});
+
+					// we can also pass the token to the browser to make requests from there
+					res.redirect(
+						'/#' +
+							querystring.stringify({
+								access_token: access_token,
+								refresh_token: refresh_token
+							})
+					);
+				} else {
+					res.redirect(
+						'/#' +
+							querystring.stringify({
+								error: 'invalid_token'
+							})
+					);
+				}
+			});
 		}
-		dbo.collection('devices').find(device['_id']).toArray().then((results) => {
-			//TODO: UPDATE DEVICE THAT'S ALREADY IN MONGO WITH NEW ACCESS TOKEN
-			if (results.length !== 0) {
-				res.send('Already in db');
-				return;
-			} else {
-				dbo.collection('devices').insertOne(device, function(err, res) {
-					if (err) throw err;
+	});
+
+	app.get('/refresh_token', function(req, res) {
+		// requesting access token from refresh token
+		var refresh_token = req.query.refresh_token;
+		var authOptions = {
+			url: 'https://accounts.spotify.com/api/token',
+			headers: { Authorization: 'Basic ' + new Buffer(clientId + ':' + secret).toString('base64') },
+			form: {
+				grant_type: 'refresh_token',
+				refresh_token: refresh_token
+			},
+			json: true
+		};
+
+		request.post(authOptions, function(error, response, body) {
+			if (!error && response.statusCode === 200) {
+				var access_token = body.access_token;
+				res.send({
+					access_token: access_token
 				});
-				res.status(200).send('Device added to DB');
 			}
 		});
 	});
 
-	app.get('/access_token', (req, res) => {
-		// search db for device_id
-		dbo.collection('devices').find(req.query.device_id).toArray().then((results) => {
-			res.status(200).send(results[0].access_token);
-		});
-	});
+	// app.get('/access_token', (req, res) => {
+	// 	// search db for device_id
+	// 	dbo.collection('devices').find(req.query.device_id).toArray().then((results) => {
+	// 		res.status(200).send(results[0].access_token);
+	// 	});
+	// });
 
 	app.post('/create_party', (req, res) => {
 		// create unique user id
