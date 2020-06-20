@@ -5,6 +5,14 @@ var cors = require('cors');
 var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
+var fs = require('fs');
+var http = require('http');
+var https = require('https');
+var privateKey = fs.readFileSync('sslcert/server.key', 'utf8');
+var certificate = fs.readFileSync('sslcert/server.crt', 'utf8');
+
+var credentials = { key: privateKey, cert: certificate };
+
 var mongo = require('mongodb');
 const MongoClient = require('mongodb').MongoClient;
 
@@ -38,7 +46,7 @@ var selectionSort = (arr) => {
  * @param  {number} length The length of the string
  * @return {string} The generated string
  */
-var generateRandomString = function(length) {
+var generateRandomString = function (length) {
 	var text = '';
 	var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -53,7 +61,7 @@ var stateKey = 'spotify_auth_state';
 const app = express();
 
 // allow cross-origin requests
-let allowCrossDomain = function(req, res, next) {
+let allowCrossDomain = function (req, res, next) {
 	res.header('Access-Control-Allow-Origin', '*');
 	res.header('Access-Control-Allow-Headers', '*');
 	res.header('Access-Control-Allow-Methods', '*');
@@ -63,7 +71,7 @@ let allowCrossDomain = function(req, res, next) {
 app.use(bodyParser.json()).use(cors()).use(cookieParser()).use(allowCrossDomain);
 
 const uri = 'mongodb+srv://Server:Crowdpleaser!@crowd-cluster-mvc86.gcp.mongodb.net/test?retryWrites=true&w=majority';
-mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function(err, db) {
+mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function (err, db) {
 	if (err) {
 		console.log('Sorry unable to connect to MongoDB Error:', err);
 	}
@@ -99,17 +107,17 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		// your application requests authorization
 		res.redirect(
 			'https://accounts.spotify.com/authorize?' +
-				querystring.stringify({
-					response_type: 'token',
-					client_id: clientId,
-					scope: scopes,
-					redirect_uri: redirectUri,
-					state: state
-				})
+			querystring.stringify({
+				response_type: 'token',
+				client_id: clientId,
+				scope: scopes,
+				redirect_uri: redirectUri,
+				state: state
+			})
 		);
 	});
 
-	app.get('/callback', function(req, res) {
+	app.get('/callback', function (req, res) {
 		// your application requests refresh and access tokens
 		// after checking the state parameter
 
@@ -120,9 +128,9 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 		if (state === null || state !== storedState) {
 			res.redirect(
 				'/#' +
-					querystring.stringify({
-						error: 'state_mismatch'
-					})
+				querystring.stringify({
+					error: 'state_mismatch'
+				})
 			);
 		} else {
 			res.clearCookie(stateKey);
@@ -139,7 +147,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 				json: true
 			};
 
-			request.post(authOptions, function(error, response, body) {
+			request.post(authOptions, function (error, response, body) {
 				if (!error && response.statusCode === 200) {
 					var access_token = body.access_token,
 						refresh_token = body.refresh_token;
@@ -151,31 +159,31 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 					};
 
 					// use the access token to access the Spotify Web API
-					request.get(options, function(error, response, body) {
+					request.get(options, function (error, response, body) {
 						console.log(body);
 					});
 
 					// we can also pass the token to the browser to make requests from there
 					res.redirect(
 						'/#' +
-							querystring.stringify({
-								access_token: access_token,
-								refresh_token: refresh_token
-							})
+						querystring.stringify({
+							access_token: access_token,
+							refresh_token: refresh_token
+						})
 					);
 				} else {
 					res.redirect(
 						'/#' +
-							querystring.stringify({
-								error: 'invalid_token'
-							})
+						querystring.stringify({
+							error: 'invalid_token'
+						})
 					);
 				}
 			});
 		}
 	});
 
-	app.get('/refresh_token', function(req, res) {
+	app.get('/refresh_token', function (req, res) {
 		// requesting access token from refresh token
 		var refresh_token = req.query.refresh_token;
 		var authOptions = {
@@ -188,7 +196,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 			json: true
 		};
 
-		request.post(authOptions, function(error, response, body) {
+		request.post(authOptions, function (error, response, body) {
 			if (!error && response.statusCode === 200) {
 				var access_token = body.access_token;
 				res.send({
@@ -230,7 +238,7 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 				let new_party = {
 					_id: party_id[0],
 					host: { access_token: access_token },
-					members: [ host_id ],
+					members: [host_id],
 					queue: [],
 					currently_playing: []
 				};
@@ -395,4 +403,8 @@ mongo.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true }, function
 	});
 });
 
-app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
+var httpServer = http.createServer(app);
+var httpsServer = https.createServer(credentials, app);
+
+httpServer.listen(3501);
+httpsServer.listen(3500);
